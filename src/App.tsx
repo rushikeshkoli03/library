@@ -1,5 +1,4 @@
-import React, { useRef, useState } from "react";
-import logo from "./logo.svg";
+import React, { useRef, useState, useEffect } from "react";
 import "./App.css";
 import {
   Box,
@@ -53,34 +52,89 @@ const data = [
 ];
 
 function App() {
-  const inputRef: any = useRef();
-  const [file, setFile] = useState<any>();
-  const [category, setCategory] = useState<any>("isbn");
-  const [searchValue, setSearchValue] = useState<any>("");
-  const [libraryData, setLibraryData] = useState(data);
-  const [sortedBy, setSortedBy] = useState<any>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [category, setCategory] = useState<ICategory>("author");
+  const [searchValue, setSearchValue] = useState<string>("");
+  const [libraryData, setLibraryData] = useState<ILibraryData[]>([]);
+  const [filteredLibrary, setFilteredLibrary] = useState<ILibraryData[]>([]);
+  const [authorData, setAuthorData] = useState<IAuthor[]>();
+  const [magazineData, setMagazineData] = useState<IMagazines[]>();
+  const [booksData, setBooksData] = useState<IBooks[]>();
+  const [sortedBy, setSortedBy] = useState<ISortedBy>(null);
 
-  const handleFileChange = (e: any) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFile(e.target.files[0]);
-      e.target.files[0].text().then((data: any) => {
+      e.target.files[0].text().then((data: string) => {
         const parsedData = parseFileData(data);
+        if (!parsedData.data) return;
         console.log(parsedData);
+        if (parsedData.header.includes("publishedAt")) {
+          let formattedData: IMagazines[] = [];
+          parsedData.data.map((d: any) => {
+            formattedData.push({
+              title: d[0],
+              isbn: d[1],
+              author: d[2],
+              date: d[3],
+            });
+          });
+          setMagazineData(formattedData);
+          setLibraryData((prevState) =>
+            prevState.concat(
+              [...formattedData].map((d: IMagazines) => ({
+                ...d,
+                category: "magazine",
+              }))
+            )
+          );
+          // setLibraryData([...formattedData.])
+        } else if (parsedData.header.includes("lastname")) {
+          let formattedData: IAuthor[] = [];
+          parsedData.data.map((d: any) => {
+            formattedData.push({
+              email: d[0],
+              firstname: d[1],
+              lastname: d[2],
+            });
+          });
+          setAuthorData(formattedData);
+        } else if (parsedData.header.includes("description")) {
+          let formattedData: IBooks[] = [];
+          parsedData.data.map((d: any) => {
+            formattedData.push({
+              title: d[0],
+              isbn: d[1],
+              author: d[2],
+              description: d[3],
+            });
+          });
+          setBooksData(formattedData);
+          setLibraryData((prevState) =>
+            prevState.concat(
+              [...formattedData].map((d: IBooks) => ({
+                ...d,
+                category: "book",
+              }))
+            )
+          );
+        }
         // uploadFileData(parsedData);
       });
     }
     e.target.value = "";
   };
 
-  function parseFileData(file: any) {
-    const rows = file.split("\r\n");
+  function parseFileData(file: string) {
+    const rows = file.split("\n");
     let data = [];
     console.log(rows);
-    for (let i = 1; i < rows.length; i++) {
-      data.push(rows[i].split(","));
+    for (let i = 1; i < rows.length - 1; i++) {
+      data.push(rows[i].split(";"));
     }
     console.log(data);
-    return { header: rows[0].split(","), data: data };
+    return { header: rows[0].split(";"), data: data };
   }
 
   async function uploadFileData(data: any) {
@@ -90,18 +144,18 @@ function App() {
     );
   }
 
-  const handleSearchChange = (e: any) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log(e.target.value);
     setSearchValue(e.target.value);
   };
 
-  const handleSelectChange = (e: any) => {
-    console.log(e.target.value);
-    setCategory(e.target.value);
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value === "author") setCategory(e.target.value);
+    if (e.target.value === "isbn") setCategory(e.target.value);
   };
 
   const sortByName = () => {
-    libraryData.sort(function (a: any, b: any) {
+    libraryData?.sort(function (a: ILibraryData, b: ILibraryData) {
       let x = a.title.toLowerCase();
       let y = b.title.toLowerCase();
       if (x > y) {
@@ -121,11 +175,15 @@ function App() {
 
   const handleExportClick = () => {
     let rows = [];
-    rows.push(Object.keys(libraryData[0]).join(","));
-    libraryData.map((d: any) => {
-      rows.push(Object.values(d).join(","));
+    if (!libraryData) return;
+    rows.push("title;isbn;author;date;description;category");
+    libraryData.map((d: ILibraryData) => {
+      rows.push(
+        `${d.title};${d.isbn};${d.author};${d?.date};${d?.description};${d.category}`
+      );
     });
-    const text = rows.join("\r\n");
+    const text = rows.join("\n");
+    console.log(text);
     var blob = new Blob([text], { type: "text/csv" });
     var url = window.URL.createObjectURL(blob);
     var a = document.createElement("a");
@@ -133,6 +191,22 @@ function App() {
     a.download = "data.csv";
     a.click();
   };
+
+  useEffect(() => {
+    if (searchValue) {
+      let reqData;
+      if (category === "author") {
+        reqData = libraryData.filter((d: ILibraryData) =>
+          d.author.includes(searchValue)
+        );
+      } else {
+        reqData = libraryData.filter((d: ILibraryData) =>
+          d.isbn.includes(searchValue)
+        );
+      }
+      setFilteredLibrary(reqData);
+    }
+  }, [searchValue]);
 
   return (
     <div>
@@ -158,13 +232,13 @@ function App() {
                 rightIcon={<FaFileUpload />}
                 colorScheme="blue"
                 variant="outline"
-                onClick={() => inputRef.current.click()}
+                onClick={() => inputRef.current?.click()}
               >
                 <input
                   type={"file"}
                   hidden
                   ref={inputRef}
-                  onChange={handleFileChange}
+                  onChange={(e) => handleFileChange(e)}
                 />
                 Upload File
               </Button>
@@ -183,7 +257,7 @@ function App() {
               w={"container.sm"}
               variant="outline"
               value={category}
-              onChange={handleSelectChange}
+              onChange={(e) => handleSelectChange(e)}
             >
               <option value="isbn">ISBN</option>
               <option value="author">Author</option>
@@ -191,7 +265,7 @@ function App() {
           </Flex>
         </Stack>
         <SimpleTable
-          data={libraryData}
+          data={searchValue ? filteredLibrary : libraryData}
           sortByName={sortByName}
           sortedBy={sortedBy}
         />
@@ -201,3 +275,27 @@ function App() {
 }
 
 export default App;
+
+interface IAuthor {
+  email: string;
+  firstname: string;
+  lastname: string;
+}
+
+interface IBooks {
+  title: string;
+  isbn: string;
+  author: string;
+  description?: string;
+}
+
+interface IMagazines {
+  title: string;
+  isbn: string;
+  author: string;
+  date?: string;
+}
+type ILibraryData = IBooks & IMagazines & { category?: "book" | "magazine" };
+
+type ICategory = "isbn" | "author";
+type ISortedBy = "asc" | "desc" | null;

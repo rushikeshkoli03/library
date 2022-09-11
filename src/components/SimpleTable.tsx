@@ -4,18 +4,15 @@ import {
   Table,
   Thead,
   Tbody,
-  Tfoot,
   Tr,
   Th,
   Td,
-  TableCaption,
   TableContainer,
-  Box,
   chakra,
 } from "@chakra-ui/react";
 import { TriangleDownIcon, TriangleUpIcon } from "@chakra-ui/icons";
 
-export default function SimpleTable(props: any) {
+export default function SimpleTable(props: IProps) {
   return (
     <TableContainer>
       <Table variant="simple">
@@ -38,14 +35,14 @@ export default function SimpleTable(props: any) {
             <Th>Category</Th>
           </Tr>
         </Thead>
-        <Tbody>
-          {props.data.map((row: any, rowIndex: any) => {
+        <Tbody data-testid="body">
+          {props.data?.map((row: ILibraryData, rowIndex: number) => {
             return (
               <Tr _hover={{ bg: `blue.100` }} key={rowIndex}>
                 <Td>{row.title}</Td>
                 <Td>{row.isbn}</Td>
                 <Td>{row.author}</Td>
-                <Td>{row.date}</Td>
+                <Td>{row?.category}</Td>
               </Tr>
             );
           })}
@@ -54,3 +51,31 @@ export default function SimpleTable(props: any) {
     </TableContainer>
   );
 }
+interface IProps {
+  data: ILibraryData[] | undefined;
+  sortByName: () => void;
+  sortedBy: ISortedBy;
+}
+
+interface IAuthor {
+  email: string;
+  firstname: string;
+  lastname: string;
+}
+
+interface IBooks {
+  title: string;
+  isbn: string;
+  author: string;
+  description?: string;
+}
+
+interface IMagazines {
+  title: string;
+  isbn: string;
+  author: string;
+  date?: string;
+}
+type ILibraryData = IBooks & IMagazines & { category?: "book" | "magazine" };
+type ICategory = "isbn" | "author";
+type ISortedBy = "asc" | "desc" | null;
